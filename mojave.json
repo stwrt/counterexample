@@ -1,0 +1,9 @@
+{
+  "kind": "service",
+  "runtime": "python",
+  "python": "3.14",
+  "start": "uvicorn app:app --host 0.0.0.0 --port $PORT",
+  "port": 8000,
+  "vcpus": 2,
+  "memMiB": 1024
+}

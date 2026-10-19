@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Counterexample</title>
+<meta name="description" content="Two functions with passing unit tests, checked against every input by Z3.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f6f3; --surface: #ffffff; --surface-2: #f0f0ec; --line: #e2e2dc;
+  --ink: #17181a; --ink-2: #55585e; --ink-3: #8a8d93;
+  --accent: #1f4fd1; --accent-ink: #ffffff;
+  --ok: #17803d; --ok-bg: #e5f4ea; --bad: #c4302b; --bad-bg: #fbe9e7; --unk: #a26b00;
+  --cell-idle: #e6e6e0; --code-mark: #fff3c4;
+  --radius: 10px;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111214; --surface: #18191c; --surface-2: #1f2024; --line: #2c2e33;
+    --ink: #ececea; --ink-2: #a6a8ad; --ink-3: #75787e;
+    --accent: #7c9cff; --accent-ink: #0d1020;
+    --ok: #4cc27a; --ok-bg: #16301f; --bad: #ff7a70; --bad-bg: #3a1a18; --unk: #e0a83a;
+    --cell-idle: #2a2c31; --code-mark: #3a3216;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111214; --surface: #18191c; --surface-2: #1f2024; --line: #2c2e33;
+  --ink: #ececea; --ink-2: #a6a8ad; --ink-3: #75787e;
+  --accent: #7c9cff; --accent-ink: #0d1020;
+  --ok: #4cc27a; --ok-bg: #16301f; --bad: #ff7a70; --bad-bg: #3a1a18; --unk: #e0a83a;
+  --cell-idle: #2a2c31; --code-mark: #3a3216;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+header { padding: 40px 0 8px; }
+.brand { font: 500 13px var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.15; margin: 10px 0 10px; font-weight: 600; letter-spacing: -.01em; }
+.lede { color: var(--ink-2); max-width: 660px; margin: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 28px 0 16px; }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+.seg button { border: 0; background: none; color: var(--ink-2); font: 500 14px var(--sans); padding: 7px 12px; border-radius: 6px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.seg small { color: var(--ink-3); font-weight: 400; margin-right: 6px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; padding-bottom: 32px; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.card + .card { margin-top: 16px; }
+.card h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin: 0; padding: 14px 16px 0; }
+.card .body { padding: 12px 16px 16px; }
+pre { margin: 0; font: 13px/1.6 var(--mono); overflow-x: auto; }
+.code { padding: 4px 0 12px; }
+.code .ln { display: block; padding: 0 16px; white-space: pre; }
+.code .ln.mark { background: var(--code-mark); }
+.tests li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); }
+.tests li:first-child { border-top: 0; }
+.tests ul { list-style: none; margin: 0; padding: 0; }
+.tests code { font: 13px var(--mono); }
+.tick { color: var(--ok); font-weight: 600; }
+.cross { color: var(--bad); font-weight: 600; }
+details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-top: 10px; }
+details pre { background: var(--surface-2); border-radius: 8px; padding: 12px; margin-top: 8px; }
+.verdict { font-size: 14px; color: var(--ink-2); margin-top: 8px; }
+.domain { color: var(--ink-2); font-size: 14px; margin: 0 0 14px; }
+.note { font-size: 13px; color: var(--ink-2); background: var(--surface-2); border-left: 3px solid var(--unk); border-radius: 4px; padding: 8px 12px; margin: -4px 0 14px; }
+.spec { border-top: 1px solid var(--line); padding: 14px 0; }
+.spec:first-of-type { border-top: 0; padding-top: 4px; }
+.spec-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.spec-title { font-weight: 600; }
+.spec-formula { font: 13px var(--mono); color: var(--ink-2); margin-top: 2px; }
+.badge { font: 500 12px var(--mono); padding: 2px 8px; border-radius: 99px; white-space: nowrap; background: var(--surface-2); color: var(--ink-3); }
+.badge.ok { background: var(--ok-bg); color: var(--ok); }
+.badge.bad { background: var(--bad-bg); color: var(--bad); }
+.cells { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 10px; }
+.cells i { width: 8px; height: 8px; border-radius: 2px; background: var(--cell-idle); }
+.cells.dense i { width: 4px; height: 4px; border-radius: 1px; gap: 1px; }
+.cells.wide i { width: auto; height: auto; padding: 2px 6px; font: 11px var(--mono); font-style: normal; color: var(--ink-3); border-radius: 4px; }
+.cells i.proved { background: var(--ok); color: var(--accent-ink); }
+.cells i.violated { background: var(--bad); color: var(--accent-ink); }
+.cells i.unknown { background: var(--unk); }
+.cex { margin-top: 12px; background: var(--bad-bg); border-radius: 8px; padding: 12px 14px; }
+.cex .plain { font-weight: 600; color: var(--bad); }
+.cex pre { margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
+.cex .why { margin-top: 6px; font-size: 14px; }
+.cex .repro { margin-top: 6px; font-size: 12px; color: var(--ink-2); font-family: var(--mono); }
+.run { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; font: 600 14px var(--sans); padding: 10px 16px; cursor: pointer; }
+.btn:disabled { opacity: .55; cursor: default; }
+select { font: 14px var(--sans); padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.stats { font: 13px var(--mono); color: var(--ink-3); }
+footer { border-top: 1px solid var(--line); padding: 20px 0 40px; color: var(--ink-3); font-size: 13px; }
+footer p { margin: 0 0 6px; max-width: 760px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">counterexample</div>
+    <h1>The tests pass. The proof doesn't.</h1>
+    <p class="lede">Two functions of the kind that sit in fintech and healthcare codebases, each with a green unit-test suite. Z3 checks the spec against every input in range, and every counterexample it finds is replayed against the real Python function.</p>
+  </header>
+
+  <div class="controls">
+    <div class="seg" id="caseSeg" role="group" aria-label="Example"></div>
+    <div class="seg" id="verSeg" role="group" aria-label="Version">
+      <button data-v="1" aria-pressed="true">Shipped</button>
+      <button data-v="2" aria-pressed="false">Fixed</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <section class="card">
+        <h2>Code under test</h2>
+        <pre class="code" id="code"></pre>
+      </section>
+      <section class="card tests">
+        <h2>Unit tests</h2>
+        <div class="body">
+          <ul id="tests"></ul>
+          <div class="verdict" id="testVerdict"></div>
+          <details><summary>Show test source</summary><pre id="testSrc"></pre></details>
+        </div>
+      </section>
+    </div>
+    <section class="card">
+      <h2>Specification</h2>
+      <div class="body">
+        <p class="domain" id="domain"></p>
+        <p class="note" id="note" hidden></p>
+        <div class="run">
+          <button class="btn" id="prove">Prove for every input</button>
+          <select id="bound" aria-label="Range"></select>
+          <span class="stats" id="stats"></span>
+        </div>
+        <div id="specs"></div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <p id="runtime">Running on Mojave.</p>
+    <p>The Z3 models are hand translations of the Python shown; that gap is why each counterexample is re-run against the real function before it is reported. The dose model uses exact arithmetic, not IEEE-754 doubles.</p>
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let data, caseId = "split", version = "1", source = null;
+
+async function load() {
+  data = await (await fetch("/api/cases")).json();
+  const rt = data.runtime;
+  $("runtime").textContent = `Running on Mojave as a Python ${rt.python} service with Z3 ${rt.z3}. Each proof run is its own process, and results stream back as each query finishes.`;
+  $("caseSeg").innerHTML = data.cases.map((c) =>
+    `<button data-c="${c.id}" aria-pressed="${c.id === caseId}"><small>${esc(c.kicker)}</small>${esc(c.title)}</button>`).join("");
+  $("caseSeg").onclick = (e) => { const b = e.target.closest("button"); if (b) { caseId = b.dataset.c; render(); } };
+  $("verSeg").onclick = (e) => { const b = e.target.closest("button"); if (b) { version = b.dataset.v; render(); } };
+  $("prove").onclick = prove;
+  $("bound").onchange = () => resetSpecs();
+  render();
+}
+
+function current() { return data.cases.find((c) => c.id === caseId); }
+
+function render() {
+  stop();
+  const c = current(), v = c.versions[version];
+  for (const b of $("caseSeg").children) b.setAttribute("aria-pressed", b.dataset.c === caseId);
+  for (const b of $("verSeg").children) b.setAttribute("aria-pressed", b.dataset.v === version);
+  $("code").innerHTML = v.source.split("\n").map((l, i) =>
+    `<span class="ln${v.changed.includes(i) ? " mark" : ""}">${esc(l) || " "}</span>`).join("");
+  $("tests").innerHTML = v.tests.map((t) =>
+    `<li><span class="${t.passed ? "tick" : "cross"}">${t.passed ? "✓" : "✗"}</span><code>${esc(t.name)}</code></li>`).join("");
+  const passed = v.tests.filter((t) => t.passed).length;
+  $("testVerdict").textContent = `${passed} of ${v.tests.length} passed, run live against this version.`;
+  $("testSrc").textContent = c.tests.join("\n\n");
+  $("domain").textContent = c.domain[0].toUpperCase() + c.domain.slice(1) + ":";
+  $("note").textContent = c.note;
+  $("note").hidden = !c.note;
+  $("bound").innerHTML = c.bounds.map((b) => `<option value="${b}">${c.bounds.length > 1 ? `N = ${b.toLocaleString()}` : `${b} ${c.cases}`}</option>`).join("");
+  $("bound").hidden = c.bounds.length < 2;
+  resetSpecs();
+}
+
+function resetSpecs() {
+  stop();
+  const c = current(), n = +$("bound").value;
+  const cls = n > 200 ? "cells dense" : n <= 16 ? "cells wide" : "cells";
+  const labels = c.id === "dose" ? data.formulary.flatMap((f) => [`${f.drug} kg`, `${f.drug} lb`]) : null;
+  $("specs").innerHTML = c.specs.map((s) => `
+    <div class="spec" id="spec-${s.id}">
+      <div class="spec-head"><span class="spec-title">${esc(s.title)}</span><span class="badge" data-badge>not run</span></div>
+      <div class="spec-formula">${esc(s.formula)}</div>
+      <div class="${cls}" data-cells>${Array.from({ length: n }, (_, i) =>
+        `<i title="${esc(labels ? labels[i] : `people = ${i + 1}`)}">${labels ? esc(labels[i]) : ""}</i>`).join("")}</div>
+      <div data-cex></div>
+    </div>`).join("");
+  $("stats").textContent = "";
+  $("prove").disabled = false;
+}
+
+function stop() { if (source) { source.close(); source = null; } }
+
+function prove() {
+  resetSpecs();
+  const c = current(), n = +$("bound").value;
+  const tally = Object.fromEntries(c.specs.map((s) => [s.id, { proved: 0, violated: 0, unknown: 0 }]));
+  let queries = 0, t0 = performance.now();
+  $("prove").disabled = true;
+  $("stats").textContent = "starting…";
+  source = new EventSource(`/api/run?case=${c.id}&version=${version}&bound=${c.bounds.length > 1 ? n : 0}`);
+  source.onmessage = (m) => {
+    const e = JSON.parse(m.data);
+    if (e.type === "queued") $("stats").textContent = "waiting for a free solver…";
+    if (e.type === "case") {
+      queries++;
+      tally[e.spec][e.result]++;
+      const row = $(`spec-${e.spec}`);
+      row.querySelector("[data-cells]").children[e.index].className = e.result;
+      badge(row, tally[e.spec], n, false);
+      $("stats").textContent = `${queries.toLocaleString()} queries · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+    }
+    if (e.type === "counterexample") {
+      $(`spec-${e.spec}`).querySelector("[data-cex]").innerHTML = `
+        <div class="cex">
+          <div class="plain">${esc(e.plain)}</div>
+          <pre>${esc(e.call)}  →  ${esc(e.got)}</pre>
+          <div class="why">${esc(e.why)}</div>
+          <div class="repro">${e.reproduced ? "✓ reproduced by calling the real function" : "✗ did not reproduce against the real function (model mismatch)"}</div>
+        </div>`;
+    }
+    if (e.type === "done") {
+      for (const s of c.specs) badge($(`spec-${s.id}`), e.counts[s.id], n, true);
+      $("stats").textContent = `${queries.toLocaleString()} queries · solver time ${(e.ms / 1000).toFixed(2)} s`;
+      finish();
+    }
+    if (e.type === "error") { $("stats").textContent = "run failed"; finish(); }
+  };
+  source.onerror = () => { if (source) { $("stats").textContent = "connection lost"; finish(); } };
+}
+
+function finish() { stop(); $("prove").disabled = false; }
+
+function badge(row, t, n, final) {
+  const b = row.querySelector("[data-badge]");
+  if (t.violated) { b.className = "badge bad"; b.textContent = `violated in ${t.violated} of ${n}`; }
+  else if (final && t.unknown) { b.className = "badge"; b.textContent = `${t.unknown} unknown`; }
+  else if (final) { b.className = "badge ok"; b.textContent = "proved"; }
+  else { b.className = "badge"; b.textContent = `${t.proved} of ${n} proved`; }
+}
+
+load();
+</script>
+</body>
+</html>
